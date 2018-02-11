@@ -44,7 +44,7 @@ class StatsCollector {
 
 	format(bytes) {
 		const types = ['B', 'KB', 'MB', 'GB', 'TB'];
-		let divideBy = 1024,
+		let divideBy = 1000,
 			amount = Math.floor(Math.log(bytes) / Math.log(divideBy));
 		return (bytes / Math.pow(divideBy, amount)).toFixed(2) + ' ' + types[amount];
 	}
