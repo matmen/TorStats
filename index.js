@@ -1,43 +1,54 @@
 const StatsD = require('node-statsd');
 const TorController = require('./TorControl');
 
-let downstream, upstream, connCount;
+class StatsCollector {
 
-const format = (bytes) => {
-	bytes = bytes || 0;
-	const types = ['B', 'KB', 'MB', 'GB', 'TB'];
-	let divideBy = 1024,
-		amount = Math.floor(Math.log(bytes) / Math.log(divideBy));
-	return parseFloat(bytes / Math.pow(divideBy, amount)).toFixed(2) + ' ' + types[amount];
+	constructor() {
+		this.torController = new TorController();
+		this.statsd = new StatsD();
+
+		this.downstream = 0;
+		this.upstream = 0;
+		this.clientCount = 0;
+
+		this.run();
+	}
+
+	async run() {
+		await this.torController.connect();
+		this.torController.subscribe(['BW']);
+
+		this.torController.on('bandwidth', (info) => {
+			this.downstream = info.download;
+			this.upstream = info.upload;
+			this.statsd.gauge('tor.downstream', this.downstream);
+			this.statsd.gauge('tor.upstream', this.upstream);
+		});
+
+		this.torController.on('orconn-status', (connections) => {
+			this.clientCount = connections.filter(connection => connection.split(' ')[1] === 'CONNECTED').length;
+			this.statsd.gauge('tor.clients', this.clientCount);
+		});
+
+		this.torController.on('error', console.error); // eslint-disable-line no-console
+
+		setInterval(() => {
+			this.torController.send('GETINFO orconn-status');
+		}, 1000);
+
+		setInterval(() => {
+			process.stdout.write('\r\u{1B}[2K');
+			process.stdout.write(`Downstream: ${this.format(this.downstream)}/s | Upstream: ${this.format(this.upstream)}/s | Connected Clients: ${this.clientCount}`);
+		}, 1000);
+	}
+
+	format(bytes) {
+		const types = ['B', 'KB', 'MB', 'GB', 'TB'];
+		let divideBy = 1024,
+			amount = Math.floor(Math.log(bytes) / Math.log(divideBy));
+		return (bytes / Math.pow(divideBy, amount)).toFixed(2) + ' ' + types[amount];
+	}
+
 };
 
-(async () => {
-	const torController = new TorController();
-	const statsd = new StatsD();
-
-	await torController.connect();
-	torController.subscribe(['BW']);
-
-	torController.on('bandwidth', (info) => {
-		downstream = info.download;
-		upstream = info.upload;
-		statsd.gauge('tor.downstream', downstream);
-		statsd.gauge('tor.upstream', upstream);
-	});
-
-	torController.on('orconn-status', (conns) => {
-		connCount = conns.filter(conn => conn.split(' ')[1] === 'CONNECTED').length;
-		statsd.gauge('tor.clients', connCount);
-	});
-
-	torController.on('error', console.error);
-
-	setInterval(() => {
-		torController.send('GETINFO orconn-status');
-	}, 1000);
-
-	setInterval(() => {
-		process.stdout.write('\r\u{1B}[2K');
-		process.stdout.write(`Downstream: ${format(downstream)}/s | Upstream: ${format(upstream)}/s | Connected Clients: ${connCount}`);
-	}, 1000);
-})();
+module.exports = new StatsCollector();

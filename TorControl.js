@@ -56,6 +56,7 @@ class TorControl extends EventEmitter {
 	}
 
 	send(message) {
+		if (!this.authenticated) throw new Error('Tried to send a message without being authenticated');
 		this.socket.write(`${message}\r\n`);
 	}
 
