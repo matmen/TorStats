@@ -49,6 +49,6 @@ class StatsCollector {
 		return (bytes / Math.pow(divideBy, amount)).toFixed(2) + ' ' + types[amount];
 	}
 
-};
+}
 
 module.exports = new StatsCollector();
