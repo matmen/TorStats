@@ -1,5 +1,5 @@
 const StatsD = require('node-statsd');
-const TorController = require('./TorControl');
+const TorController = require('./lib/TorControl');
 
 class StatsCollector {
 
